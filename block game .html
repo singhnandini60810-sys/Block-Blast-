@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Advanced 32x32 Block Game</title>
+<style>
+body{
+    background:#111;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+#game{
+    display:grid;
+    grid-template-columns:repeat(32,18px);
+    grid-template-rows:repeat(32,18px);
+    gap:1px;
+    margin:20px auto;
+    width:fit-content;
+}
+.cell{
+    width:18px;
+    height:18px;
+    background:#222;
+}
+.filled{ background:#00ffcc; }
+.active{ background:#ff4444; }
+
+button{
+    padding:8px 15px;
+    margin:5px;
+}
+</style>
+</head>
+<body>
+
+<h2>Score: <span id="score">0</span></h2>
+<h3>High Score: <span id="highScore">0</span></h3>
+<button onclick="startGame()">Start Game</button>
+
+<div id="game"></div>
+
+<script>
+const size = 32;
+let grid = [];
+let score = 0;
+let highScore = localStorage.getItem("highScore") || 0;
+let currentPiece = null;
+let interval;
+
+document.getElementById("highScore").textContent = highScore;
+const game = document.getElementById("game");
+
+function createGrid(){
+    game.innerHTML="";
+    grid=[];
+    for(let r=0;r<size;r++){
+        grid[r]=[];
+        for(let c=0;c<size;c++){
+            const cell=document.createElement("div");
+            cell.classList.add("cell");
+            game.appendChild(cell);
+            grid[r][c]=0;
+        }
+    }
+}
+
+function draw(){
+    const cells = game.children;
+    for(let r=0;r<size;r++){
+        for(let c=0;c<size;c++){
+            cells[r*size+c].className="cell";
+            if(grid[r][c]===1) cells[r*size+c].classList.add("filled");
+        }
+    }
+    if(currentPiece){
+        currentPiece.shape.forEach(([r,c])=>{
+            cells[(currentPiece.row+r)*size+(currentPiece.col+c)]
+                .classList.add("active");
+        });
+    }
+}
+
+/* ---- MORE COMPLEX SHAPES (1–8 BLOCKS) ---- */
+const shapes = [
+    [[0,0]],
+    [[0,0],[1,0]],
+    [[0,0],[0,1]],
+    [[0,0],[1,0],[2,0]],
+    [[0,0],[0,1],[0,2]],
+    [[0,0],[1,0],[0,1]],
+    [[0,0],[1,0],[2,0],[3,0]],
+    [[0,0],[0,1],[0,2],[0,3]],
+    [[0,0],[1,0],[2,0],[2,1]],
+    [[0,1],[1,1],[2,1],[2,0]],
+    [[0,0],[0,1],[1,0],[1,1]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0]],
+    [[0,0],[0,1],[0,2],[0,3],[0,4]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0]],
+    [[0,0],[0,1],[1,1],[1,2],[2,2]],
+    [[0,0],[0,1],[0,2],[1,1],[2,1]],
+    [[0,0],[1,0],[1,1],[2,1],[2,2]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0]],
+    [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5]],
+    [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]]
+];
+
+function randomPiece(){
+    return {
+        shape: shapes[Math.floor(Math.random()*shapes.length)],
+        row: 0,
+        col: Math.floor(size/2)-1
+    };
+}
+
+function collision(){
+    return currentPiece.shape.some(([r,c])=>{
+        let newR=currentPiece.row+r;
+        let newC=currentPiece.col+c;
+        return newR>=size || newC<0 || newC>=size || grid[newR][newC]===1;
+    });
+}
+
+function merge(){
+    currentPiece.shape.forEach(([r,c])=>{
+        grid[currentPiece.row+r][currentPiece.col+c]=1;
+    });
+}
+
+function clearRows(){
+    for(let r=size-1;r>=0;r--){
+        if(grid[r].every(val=>val===1)){
+            grid.splice(r,1);
+            grid.unshift(new Array(size).fill(0));
+            score += size;
+            r++;
+        }
+    }
+    document.getElementById("score").textContent=score;
+}
+
+function checkTopReached(){
+    for(let c=0;c<size;c++){
+        if(grid[0][c]===1){
+            return true;
+        }
+    }
+    return false;
+}
+
+function drop(){
+    currentPiece.row++;
+    if(collision()){
+        currentPiece.row--;
+        merge();
+        clearRows();
+
+        if(checkTopReached()){
+            gameOver();
+            return;
+        }
+
+        currentPiece=randomPiece();
+        if(collision()){
+            gameOver();
+            return;
+        }
+    }
+    draw();
+}
+
+function gameOver(){
+    clearInterval(interval);
+    alert("Game Over!");
+    if(score>highScore){
+        highScore=score;
+        localStorage.setItem("highScore",highScore);
+    }
+    document.getElementById("highScore").textContent=highScore;
+}
+
+function startGame(){
+    score=0;
+    document.getElementById("score").textContent=0;
+    createGrid();
+    currentPiece=randomPiece();
+    draw();
+    clearInterval(interval);
+    interval=setInterval(drop,350);
+}
+
+document.addEventListener("keydown",e=>{
+    if(!currentPiece) return;
+
+    if(e.key==="ArrowLeft") currentPiece.col--;
+    if(e.key==="ArrowRight") currentPiece.col++;
+    if(e.key==="ArrowDown") currentPiece.row++;
+
+    if(collision()){
+        if(e.key==="ArrowLeft") currentPiece.col++;
+        if(e.key==="ArrowRight") currentPiece.col--;
+        if(e.key==="ArrowDown") currentPiece.row--;
+    }
+    draw();
+});
+</script>
+
+</body>
+</html>
